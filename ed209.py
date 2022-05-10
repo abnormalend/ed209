@@ -1,13 +1,15 @@
 #!/usr/bin/python3
 
 # from sqlite3 import Timestamp
-from re import T
+# from re import T
 from pydbus import SystemBus
 from gi.repository import GLib
+from schedule import every, repeat, run_pending
 import random
 import logging
 import configparser
 import json
+from pyjokes import get_joke
 
 # Setup stuff
 bus = SystemBus()
@@ -30,16 +32,24 @@ owner = config['admin']['owner']
 bot_admins = json.loads(config['admin']['bot_admins'])
 logging.getLogger().setLevel(log_level_info.get(config['logging']['loglevel'],logging.ERROR))
 
+
+
 # Helper functions
+@repeat(every().tuesday.at('17:45'))
+def messageOwner():
+    signal.sendMessage("new cron test", [], [owner])
+
+# @repeat(every(10).minutes)
+# def messageOwner():
+#     signal.sendMessage("Testing 123...", [], [owner])
 
 
-
-def universalReply(timestamp, sender, groupID, message, attachments = None):
+def universalReply(timestamp, sender, groupID, message, attachments = []):
     signal.sendReadReceipt(sender, [timestamp])
     if groupID:
-        signal.sendGroupMessage(message, [], groupID)
+        signal.sendGroupMessage(message, attachments, groupID)
     else:
-        signal.sendMessage(message, [], [sender])
+        signal.sendMessage(message, attachments, [sender])
 
 def loadConfig():
     logging.info("Work in progress")
@@ -56,7 +66,34 @@ def eightBall(timestamp, sender, groupID, message, attachments):
     universalReply(timestamp, sender, groupID, '8ball: ' + random.choice(responses))
 
 def showAdmins(timestamp, sender, groupID, message, attachments):
-    response = "Admin users are: {}".format(', '.join(bot_admins + [owner]))
+    response = f"Admin users are: {', '.join(bot_admins + [owner])}"
+    universalReply(timestamp, sender, groupID, response)
+
+def sendNudes(timestamp, sender, groupID, message, attachments):
+    piclist = ['/home/ubuntu/ed209/images/doge.jpg']
+    # response = get_joke()
+    response =  ""
+    universalReply(timestamp, sender, groupID, response, piclist)
+
+def sendJoke(timestamp, sender, groupID, message, attachments):
+    piclist = ['/home/ubuntu/ed209/images/doge.jpg']
+    response = get_joke()
+    universalReply(timestamp, sender, groupID, response, piclist)
+
+def sendHelp(timestamp, sender, groupID, message, attachments):
+    response = """Available commands:
+/help
+/8ball
+/send_joke
+/send_nudes
+/show_admins
+
+root only:
+/add_admin
+/del_admin
+/save_config
+
+    """
     universalReply(timestamp, sender, groupID, response)
 
 # Admin Functions
@@ -66,10 +103,10 @@ def addAdmin(timestamp, sender, groupID, message, attachments):
     if len(new_admin) == 12 and new_admin[0] == "+" and new_admin[1:].isnumeric():
         
         bot_admins.append(new_admin)
-        response = "Adding new admin user: {}".format(new_admin)
+        response = f"Adding new admin user: {new_admin}"
         logging.debug(response)
     else:
-        response = "New user did not pass checks, cannot add {}".format(new_admin)
+        response = f"New user did not pass checks, cannot add {new_admin}"
         logging.warning(response)
     universalReply(timestamp, sender, groupID, response)
 
@@ -78,15 +115,15 @@ def delAdmin(timestamp, sender, groupID, message, attachments):
     if len(del_admin) == 12 and del_admin[0] == "+" and del_admin[1:].isnumeric() and del_admin in bot_admins:
         
         bot_admins.remove(del_admin)
-        response = "Removing admin user: {}".format(del_admin)
+        response = f"Removing admin user: {del_admin}"
         logging.debug(response)
     else:
-        response = "New user did not pass checks, cannot remove {}".format(del_admin)
+        response = f"New user did not pass checks, cannot remove {del_admin}"
         logging.warning(response)
     universalReply(timestamp, sender, groupID, response)
 
 def messageHandler (timestamp, sender, groupID, message, attachments):
-    logging.info("sender: {}, group: {}, message: {}".format(sender, groupID, message))
+    logging.debug(f"sender: {sender}, group: {groupID}, message: {message}")
     if len(message) > 0 and message[0] == '/':  # If a message doesn't start with / we don't care and quit
     # Each defined function that ed209 can respond to gets set up here.  We use startswith by default but 
     # have the option of doing more complicated matching of the string
@@ -95,6 +132,16 @@ def messageHandler (timestamp, sender, groupID, message, attachments):
 
         elif message[1:].startswith('show_admins'):
             showAdmins(timestamp, sender, groupID, message, attachments)
+
+        elif message[1:].startswith('send_nudes'):
+            sendNudes(timestamp, sender, groupID, message, attachments)
+
+        elif message[1:].startswith('send_joke'):
+            sendJoke(timestamp, sender, groupID, message, attachments)       
+
+        elif message[1:].startswith('help'):
+            sendHelp(timestamp, sender, groupID, message, attachments)  
+
 
         # Root user (owner) functions here
         if sender == owner:
@@ -109,7 +156,16 @@ def messageHandler (timestamp, sender, groupID, message, attachments):
                 saveConfig(timestamp, sender, groupID, message, attachments)
     return
 
-signal.onMessageReceived = messageHandler
+# schedule.every(10).minutes.do(messageOwner)
+
+def cronHandler():
+    logging.debug("cron hit")
+    run_pending()
+    return True
+
+
+GLib.timeout_add_seconds(60,cronHandler)             # Run the cron handler every 60 seconds
+signal.onMessageReceived = messageHandler       # Run the message handler every time we get a signal message
 
 if __name__ == '__main__':
     loop.run()
