@@ -131,3 +131,4 @@ dmypy.json
 
 #Bot config file
 config.ini
+.vscode
