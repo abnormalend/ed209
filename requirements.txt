@@ -1,2 +1,4 @@
 schedule
 pyjokes
+boto3
+praw
