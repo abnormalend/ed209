@@ -2,10 +2,13 @@ import configparser
 import json
 import logging
 import random
+import os
 from pyjokes import get_joke
 from schedule import every, repeat, run_pending
 # import redditbot
 import s3bothelper
+
+
 class signalbot():
 
     def __init__(self, signal, configPath):
@@ -22,8 +25,14 @@ class signalbot():
         self.admin_function_list = []
         self.root_function_list = []
         # self.reddit = redditbot.redditbot()
-        self.s3 = s3bothelper.s3bothelper(self.config['s3']['bucket'])
+        self.s3 = s3bothelper.s3bothelper(self.config['s3']['bucket'],self.config['s3']['themes'] , self.config['s3']['destination'])
         self._botFunctions()
+
+
+# Cleanup and refresh stuff
+    @repeat(every().day.at("00:30"))
+    def _clean_temp(self):
+        os.system(f"sudo find {self.config['s3']['destination']} -type f -atime +{self.config['s3']['cleaningage']} -delete")
 
 
 # Internal functions
@@ -172,6 +181,11 @@ class signalbot():
     def echo(self, timestamp, sender, groupID, message, attachments):
         self._universalReply(timestamp, sender, groupID, message[5:].strip())
 
+    def drunkpost(self, timestamp, sender, groupID, message, attachments):
+        self._universalReply(timestamp, sender, groupID, "coming soon...")
+
+    def boldtest(self, timestamp, sender, groupID, message, attachments):
+        self._universalReply(timestamp, sender, groupID, "𝐛𝐨𝐥𝐝 𝐭𝐞𝐱𝐭 𝕓𝕠𝕝𝕕 𝕥𝕖𝕩𝕥 𝗯𝗼𝗹𝗱 𝘁𝗲𝘅𝘁")
 ### ADMIN FUNCTIONS
 
     def admin_add_blacklist(self, timestamp, sender, groupID, message, attachments):
