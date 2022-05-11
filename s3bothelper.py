@@ -1,15 +1,17 @@
 import boto3
 import logging
 import random
+import os
 
 class s3bothelper():
 
-    def __init__(self, bucket, themesFolder = "themes/"):
+    def __init__(self, bucket, themesFolder = "themes/", destination = "/tmp/ed209"):
         self.s3 = boto3.client('s3')
         self.bucket = bucket
         self.themes = []
         self.themes_folder = themesFolder
         self.filelists = {}
+        self.dest = destination
         self.updateThemes()
 
     def _getFileList(self, prefix):
@@ -33,7 +35,8 @@ class s3bothelper():
         if not prefix in self.filelists:
             self._getFileList(prefix)
         image = random.choice(self.filelists[prefix])
-        destination = f"/tmp/{image.replace(prefix,'')}"
+        destination = f"{self.dest}/{image.replace(prefix,'')}"
+        if not os.path.exists(self.dest): os.mkdir(self.dest) 
         self.s3.download_file(self.bucket, image, destination)
 
         if moveAfter:
