@@ -9,7 +9,7 @@ import signalbot
 bus = SystemBus()           # This is our feed of events from signal
 loop = GLib.MainLoop()      # This lets us trigger on the events from signal (and schedule)
 signal = bus.get('org.asamk.Signal', '/org/asamk/Signal/_16165281428')  # All our bots brains
-logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s', level=logging.DEBUG) # Set up our main logging
+logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s', level=logging.INFO) # Set up our main logging
 
 mybot = signalbot.signalbot(signal, '/home/ubuntu/ed209/config.ini') # Create our bot, load our settings file
 
