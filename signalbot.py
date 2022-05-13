@@ -5,7 +5,7 @@ import random
 import os
 from pyjokes import get_joke
 from schedule import every, repeat, run_pending
-# import redditbot
+import redditbot
 import s3bothelper
 
 
@@ -24,7 +24,7 @@ class signalbot():
         self.function_list = []
         self.admin_function_list = []
         self.root_function_list = []
-        # self.reddit = redditbot.redditbot()
+        self.reddit = redditbot.redditbot()
         self.s3 = s3bothelper.s3bothelper(self.config['s3']['bucket'],self.config['s3']['themes'] , self.config['s3']['destination'])
         self._botFunctions()
 
@@ -184,8 +184,16 @@ class signalbot():
     def drunkpost(self, timestamp, sender, groupID, message, attachments):
         self._universalReply(timestamp, sender, groupID, "coming soon...")
 
-    def boldtest(self, timestamp, sender, groupID, message, attachments):
-        self._universalReply(timestamp, sender, groupID, "𝐛𝐨𝐥𝐝 𝐭𝐞𝐱𝐭 𝕓𝕠𝕝𝕕 𝕥𝕖𝕩𝕥 𝗯𝗼𝗹𝗱 𝘁𝗲𝘅𝘁")
+    def heyclay(self, timestamp, sender, groupID, message, attachments):
+        self._universalReply(timestamp, sender, groupID, "hey clay")
+
+    # def boldtest(self, timestamp, sender, groupID, message, attachments):
+    #     self._universalReply(timestamp, sender, groupID, "𝐛𝐨𝐥𝐝 𝐭𝐞𝐱𝐭 𝕓𝕠𝕝𝕕 𝕥𝕖𝕩𝕥 𝗯𝗼𝗹𝗱 𝘁𝗲𝘅𝘁")
+    def reddit_random(self, timestamp, sender, groupID, message, attachments):
+        subreddit = message[14:].strip()
+        title, file = self.reddit.getRandomPost(subreddit if subreddit else self.config['reddit']['default_subreddit'])
+        self._universalReply(timestamp, sender, groupID, title, [file])
+
 ### ADMIN FUNCTIONS
 
     def admin_add_blacklist(self, timestamp, sender, groupID, message, attachments):

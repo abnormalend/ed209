@@ -1,3 +1,4 @@
 schedule
 pyjokes
 boto3
+slugify
