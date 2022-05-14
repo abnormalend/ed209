@@ -6,14 +6,15 @@ from bothelper import bothelper
 
 class s3bothelper(bothelper):
 
-    def __init__(self, signal, bucket, themesFolder = "themes/", destination = "/tmp/ed209"):
+    def __init__(self, signal, config):
         self.s3 = boto3.client('s3')
         self.signal = signal
-        self.bucket = bucket
+        self.config = config
+        self.bucket = self.config['s3']['bucket']
         self.themes = []
-        self.themes_folder = themesFolder
+        self.themes_folder = self.config['s3']['themes']
         self.filelists = {}
-        self.dest = destination
+        self.dest = self.config['s3']['destination']
         self.function_list = []
         for item in dir(__class__):
             if not item.startswith("_") and not item.endswith('Handler'):
@@ -49,14 +50,6 @@ class s3bothelper(bothelper):
             self.s3.delete_object(Bucket=self.bucket, Key=image)
             self._getFileList(prefix).remove(image)
         return destination
-        # print(image)
-
-    # def _universalReply(self, timestamp, sender, groupID, message, attachments = []):
-    #     self.signal.sendReadReceipt(sender, [timestamp])
-    #     if groupID:
-    #         self.signal.sendGroupMessage(message, attachments, groupID)
-    #     else:
-    #         self.signal.sendMessage(message, attachments, [sender])
 
     def show_themes(self, timestamp, sender, groupID, message, attachments):
         self._updateThemes()
@@ -64,16 +57,16 @@ class s3bothelper(bothelper):
         self._universalReply(timestamp, sender, groupID, response)
 
     def show_active_theme(self, timestamp, sender, groupID, message, attachments):
-        response = f"Current theme: {self.config['humpday']['selected_theme']}"
+        response = f"Current theme: {self.config['s3']['selected_theme']}"
         self._universalReply(timestamp, sender, groupID, response)
 
     def set_theme(self, timestamp, sender, groupID, message, attachments):
         new_theme = message[10:].strip()
-        self.config['humpday']['selected_theme'] = new_theme
+        self.config['s3']['selected_theme'] = new_theme
         self._saveConfig()
         self.show_active_theme( timestamp, sender, groupID, message, attachments)
 
-    def send_nudes(self, timestamp, sender, groupID, message, attachments):
+    def send_pic(self, timestamp, sender, groupID, message, attachments):
         theme = message[11:].strip()
         theme = theme if theme in self.s3.themes else None
 
