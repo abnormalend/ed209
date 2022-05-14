@@ -33,10 +33,7 @@ class signalbot():
         if self.config['s3'].getboolean('enabled'):
             import s3bothelper
             self.helper_list.append('s3')
-            self.s3 = s3bothelper.s3bothelper(self.signal,
-                                              self.config['s3']['bucket'],
-                                              self.config['s3']['themes'] , 
-                                              self.config['s3']['destination'])
+            self.s3 = s3bothelper.s3bothelper(self.signal, self.config)
 
 # Cleanup and refresh stuff
     @repeat(every().day.at("00:30"))
@@ -64,7 +61,7 @@ class signalbot():
 
     def _saveConfig(self):
         """Save settings to the config file."""
-        with open(self.configPath, 'w') as configfile:
+        with open(self.config['self']['path'], 'w') as configfile:
             self.config.write(configfile)
         return True
 
