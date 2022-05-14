@@ -6,7 +6,7 @@ import os
 from pyjokes import get_joke
 from schedule import every, repeat, run_pending
 import redditbot
-import s3bothelper
+# import s3bothelper
 
 
 class signalbot():
@@ -24,10 +24,19 @@ class signalbot():
         self.function_list = []
         self.admin_function_list = []
         self.root_function_list = []
+        self.helper_list = []
         self.reddit = redditbot.redditbot()
-        self.s3 = s3bothelper.s3bothelper(self.config['s3']['bucket'],self.config['s3']['themes'] , self.config['s3']['destination'])
+        
         self._botFunctions()
 
+        # Feature specific things here
+        if self.config['s3'].getboolean('enabled'):
+            import s3bothelper
+            self.helper_list.append('s3')
+            self.s3 = s3bothelper.s3bothelper(self.signal,
+                                              self.config['s3']['bucket'],
+                                              self.config['s3']['themes'] , 
+                                              self.config['s3']['destination'])
 
 # Cleanup and refresh stuff
     @repeat(every().day.at("00:30"))
@@ -38,7 +47,7 @@ class signalbot():
 # Internal functions
 
     def _botFunctions(self):
-        for item in dir(signalbot):
+        for item in dir(__class__):
             if not item.startswith("_") and not item.endswith('Handler') and not item.startswith('admin') and not item.startswith('root'):
                 self.function_list.append(item)
             elif not item.startswith("_") and not item.endswith('Handler') and item.startswith('admin'):
@@ -99,38 +108,28 @@ class signalbot():
 
 
     def messageHandler(self, timestamp, sender, groupID, message, attachments):
-        found = False
         logging.debug(f"sender: {sender}, group: {groupID}, message: {message}")
         if len(message) > 0 and message[0] == '/':  # If a message doesn't start with / we don't care and quit
+            messagefields = message[1:].split()
             if sender not in self.blacklist:
-                for item in self.function_list:
-                    if message[1:].startswith(item):
-                        getattr(self, item)(timestamp, sender, groupID, message, attachments)
-                        found = True
-                        break
-                
-                # Admin only functions
-                if sender in self.admins or sender == self.owner:
-                    for item in self.admin_function_list:
-                        if message[1:].startswith(item): 
-                            getattr(self, item)(timestamp, sender, groupID, message, attachments)
+                if messagefields[0] in self.function_list:
+                    getattr(self, messagefields[0])(timestamp, sender, groupID, message, attachments)
+                elif messagefields[0] in self.admin_function_list and (sender in self.admins or sender == self.owner):
+                    getattr(self, messagefields[0])(timestamp, sender, groupID, message, attachments)
+                elif messagefields[0] in self.root_function_list and sender == self.owner:
+                    getattr(self, messagefields[0])(timestamp, sender, groupID, message, attachments)
+                else:
+                    # It isn't any of the core functions, so lets check our helpers
+                    found = False #so we can send a failure at the end if none of these match
+                    for bothelper in self.helper_list:
+                        if messagefields[0] in getattr(self, bothelper).function_list:
+                            getattr(getattr(self, bothelper), messagefields[0])(timestamp, sender, groupID, message, attachments)
                             found = True
                             break
-
-                # Root only functions
-                if sender == self.owner:
-                    for item in self.root_function_list:
-                        if message[1:].startswith(item): 
-                            getattr(self, item)(timestamp, sender, groupID, message, attachments)
-                            found = True
-                            break
+                    if not found: #respond with a failure message because it didn't match any known command.
+                        self._noMatchFound(timestamp, sender, groupID, message, attachments)
             else:
                 self._blacklistHandler(timestamp, sender, groupID, message, attachments)
-                found = True
-
-            # We made it all the way to the end and didn't find anything, better do our no match function
-            if not found:
-                self._noMatchFound(timestamp, sender, groupID, message, attachments)
 
 # Unrestricted functions
 
@@ -145,7 +144,10 @@ class signalbot():
 
     def help(self, timestamp, sender, groupID, message, attachments):
         nl = '\n'
-        response = f"Commands:{nl}{nl.join(self.function_list)} {nl}{nl}Admin Commands:{nl}{nl.join(self.admin_function_list)}{nl}{nl}Root Commands:{nl}{nl.join(self.root_function_list)}"
+        response = f"Commands:{nl}{nl.join(self.function_list)}"
+        for bothelper in self.helper_list:
+                response = response + f"{nl}{nl}{bothelper} Commands:{nl}{nl.join(getattr(self, bothelper).function_list)}"
+        response = response + f"{nl}{nl}Admin Commands:{nl}{nl.join(self.admin_function_list)}{nl}{nl}Root Commands:{nl}{nl.join(self.root_function_list)}"
         self._universalReply(timestamp, sender, groupID, response)
 
     def show_admins(self, timestamp, sender, groupID, message, attachments):
@@ -156,27 +158,27 @@ class signalbot():
         response = f"Blacklisted users are: {', '.join(self.blacklist)}"
         self._universalReply(timestamp, sender, groupID, response)
 
-    def show_themes(self, timestamp, sender, groupID, message, attachments):
-        self.s3.updateThemes()
-        response = f"Avilable themes: {', '.join(self.s3.themes)}"
-        self._universalReply(timestamp, sender, groupID, response)
+    # def show_themes(self, timestamp, sender, groupID, message, attachments):
+    #     self.s3.updateThemes()
+    #     response = f"Avilable themes: {', '.join(self.s3.themes)}"
+    #     self._universalReply(timestamp, sender, groupID, response)
 
-    def show_active_theme(self, timestamp, sender, groupID, message, attachments):
-        response = f"Current theme: {self.config['humpday']['selected_theme']}"
-        self._universalReply(timestamp, sender, groupID, response)
+    # def show_active_theme(self, timestamp, sender, groupID, message, attachments):
+    #     response = f"Current theme: {self.config['humpday']['selected_theme']}"
+    #     self._universalReply(timestamp, sender, groupID, response)
 
-    def set_theme(self, timestamp, sender, groupID, message, attachments):
-        new_theme = message[10:].strip()
-        self.config['humpday']['selected_theme'] = new_theme
-        self._saveConfig()
-        self.show_active_theme( timestamp, sender, groupID, message, attachments)
+    # def set_theme(self, timestamp, sender, groupID, message, attachments):
+    #     new_theme = message[10:].strip()
+    #     self.config['humpday']['selected_theme'] = new_theme
+    #     self._saveConfig()
+    #     self.show_active_theme( timestamp, sender, groupID, message, attachments)
 
-    def send_nudes(self, timestamp, sender, groupID, message, attachments):
-        theme = message[11:].strip()
-        theme = theme if theme in self.s3.themes else None
+    # def send_nudes(self, timestamp, sender, groupID, message, attachments):
+    #     theme = message[11:].strip()
+    #     theme = theme if theme in self.s3.themes else None
 
-        file = self.s3.getRandomImage(theme, True if groupID else False)
-        self._universalReply(timestamp, sender, groupID, "", [file])
+    #     file = self.s3.getRandomImage(theme, True if groupID else False)
+    #     self._universalReply(timestamp, sender, groupID, "", [file])
 
     def echo(self, timestamp, sender, groupID, message, attachments):
         self._universalReply(timestamp, sender, groupID, message[5:].strip())
