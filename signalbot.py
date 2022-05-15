@@ -5,7 +5,7 @@ import random
 import os
 from pyjokes import get_joke
 from schedule import every, repeat, run_pending
-import redditbot
+# import redditbot
 # import s3bothelper
 
 
@@ -25,7 +25,7 @@ class signalbot():
         self.admin_function_list = []
         self.root_function_list = []
         self.helper_list = []
-        self.reddit = redditbot.redditbot()
+        # self.reddit = redditbot.redditbot()
         
         self._botFunctions()
 
@@ -34,6 +34,11 @@ class signalbot():
             import s3bothelper
             self.helper_list.append('s3')
             self.s3 = s3bothelper.s3bothelper(self.signal, self.config)
+
+        if self.config['reddit'].getboolean('enabled'):
+            import redditbothelper
+            self.helper_list.append('reddit')
+            self.reddit = redditbothelper.redditbothelper(self.signal, self.config)
 
 # Cleanup and refresh stuff
     @repeat(every().day.at("00:30"))
@@ -155,6 +160,10 @@ class signalbot():
         response = f"Blacklisted users are: {', '.join(self.blacklist)}"
         self._universalReply(timestamp, sender, groupID, response)
 
+    def branch(self, timestamp, sender, groupID, message, attachments):
+        results = os.popen('git rev-parse --abbrev-ref HEAD').read()
+        self._universalReply(timestamp, sender, groupID, results)
+
     # def show_themes(self, timestamp, sender, groupID, message, attachments):
     #     self.s3.updateThemes()
     #     response = f"Avilable themes: {', '.join(self.s3.themes)}"
@@ -188,10 +197,7 @@ class signalbot():
 
     # def boldtest(self, timestamp, sender, groupID, message, attachments):
     #     self._universalReply(timestamp, sender, groupID, "𝐛𝐨𝐥𝐝 𝐭𝐞𝐱𝐭 𝕓𝕠𝕝𝕕 𝕥𝕖𝕩𝕥 𝗯𝗼𝗹𝗱 𝘁𝗲𝘅𝘁")
-    def reddit_random(self, timestamp, sender, groupID, message, attachments):
-        subreddit = message[14:].strip()
-        title, file = self.reddit.getRandomPost(subreddit if subreddit else self.config['reddit']['default_subreddit'])
-        self._universalReply(timestamp, sender, groupID, title, [file])
+
 
 ### ADMIN FUNCTIONS
 

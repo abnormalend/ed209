@@ -4,6 +4,10 @@ class bothelper():
     def __init__(self, signal, config):
         self.signal = signal
         self.config = config
+        self.function_list = []
+        for item in dir(__class__):
+            if not item.startswith("_") and not item.endswith('Handler'):
+                self.function_list.append(item)
 
     def _universalReply(self, timestamp, sender, groupID, message, attachments = []):
         self.signal.sendReadReceipt(sender, [timestamp])
