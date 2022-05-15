@@ -11,15 +11,15 @@ class s3bothelper(bothelper):
         self.signal = signal
         self.config = config
         self.bucket = self.config['s3']['bucket']
-        self.themes = []
-        self.themes_folder = self.config['s3']['themes']
+        self.subdirs = []
+        self.basedir= self.config['s3']['basedir']
         self.filelists = {}
         self.dest = self.config['s3']['destination']
         self.function_list = []
         for item in dir(__class__):
             if not item.startswith("_") and not item.endswith('Handler'):
                 self.function_list.append(item)
-        self._updateThemes()
+        self._updateSubdirs()
 
     def _getFileList(self, prefix):
         paginator = self.s3.get_paginator('list_objects_v2')
@@ -30,14 +30,15 @@ class s3bothelper(bothelper):
                 file_list.append(obj['Key'])
         self.filelists[prefix] = file_list
 
-    def _updateThemes(self):
-        self.themes = []
-        for o in self.s3.list_objects(Bucket=self.bucket, Prefix=self.themes_folder, Delimiter='/').get('CommonPrefixes'):
-            self.themes.append(o.get('Prefix').replace(self.themes_folder, '')[:-1])
-        logging.debug(self.themes)
+    def _updateSubdirs(self):
+        """Get a list of subdirectories inside the basedir, build a list of them"""
+        self.subdirs = []   # Erase the current subdirs so we don't double up anything
+        for o in self.s3.list_objects(Bucket=self.bucket, Prefix=self.basedir, Delimiter='/').get('CommonPrefixes'):
+            self.subdirs.append(o.get('Prefix').replace(self.basedir, '')[:-1])
+        logging.debug(self.subdirs)
 
-    def _getRandomImage(self, theme = None, moveAfter=False):
-        prefix = f"themes/{theme}/" if theme else "outbox/"
+    def _getRandomImage(self, subdir = None, moveAfter=False):
+        prefix = f"{self.basedir}{subdir}" if subdir else self.config['s3']['default_path']
         if not prefix in self.filelists:
             self._getFileList(prefix)
         image = random.choice(self.filelists[prefix])
@@ -46,29 +47,31 @@ class s3bothelper(bothelper):
         self.s3.download_file(self.bucket, image, destination)
 
         if moveAfter:
-            self.s3.copy_object(Bucket=self.bucket, CopySource=f"{self.bucket}/{image}", Key=f"{image.replace(prefix,'sent/')}")
+            self.s3.copy_object(Bucket=self.bucket, CopySource=f"{self.bucket}/{image}", Key=f"{image.replace(prefix,self.config['s3']['move_after_dest'])}")
             self.s3.delete_object(Bucket=self.bucket, Key=image)
             self._getFileList(prefix).remove(image)
         return destination
 
-    def show_themes(self, timestamp, sender, groupID, message, attachments):
-        self._updateThemes()
-        response = f"Avilable themes: {', '.join(self.themes)}"
+    def show_subdirs(self, timestamp, sender, groupID, message, attachments):
+        self._updateSubdirs()
+        nl = '\n'
+        response = f"Avilable subdirs:{nl}{nl.join(self.subdirs)}"
+        if self.config['s3']['selected_subdir']:
+            response = response + f"{nl}{nl}Selected subdir: {self.config['s3']['selected_subdir']}"
         self._universalReply(timestamp, sender, groupID, response)
 
-    def show_active_theme(self, timestamp, sender, groupID, message, attachments):
-        response = f"Current theme: {self.config['s3']['selected_theme']}"
-        self._universalReply(timestamp, sender, groupID, response)
+    # def show_active_subdir(self, timestamp, sender, groupID, message, attachments):
+    #     response = f"Current subdir: {self.config['s3']['selected_subdir']}"
+    #     self._universalReply(timestamp, sender, groupID, response)
 
-    def set_theme(self, timestamp, sender, groupID, message, attachments):
-        new_theme = message[10:].strip()
-        self.config['s3']['selected_theme'] = new_theme
+    def set_subdir(self, timestamp, sender, groupID, message, attachments):
+        new_subdir= message.split()[1]
+        self.config['s3']['selected_subdir'] = new_subdir
         self._saveConfig()
-        self.show_active_theme( timestamp, sender, groupID, message, attachments)
+        self.show_subdirs( timestamp, sender, groupID, message, attachments)
 
     def send_pic(self, timestamp, sender, groupID, message, attachments):
-        theme = message[11:].strip()
-        theme = theme if theme in self.s3.themes else None
-
-        file = self.s3.getRandomImage(theme, True if groupID else False)
+        reqd_subdir = message.split()[1] if len(message.split()) > 1 else None
+        subdir = reqd_subdir if reqd_subdir in self.subdirs else None
+        file = self._getRandomImage(subdir, True if groupID else False)
         self._universalReply(timestamp, sender, groupID, "", [file])
