@@ -40,6 +40,12 @@ class signalbot():
             self.helper_list.append('reddit')
             self.reddit = redditbothelper.redditbothelper(self.signal, self.config)
 
+        if self.config['vote'].getboolean('enabled'):
+            import votebothelper
+            self.helper_list.append('vote')
+            self.vote = votebothelper.votebothelper(self.signal, self.config)
+
+
 # Cleanup and refresh stuff
     @repeat(every().day.at("00:30"))
     def _clean_temp(self):
